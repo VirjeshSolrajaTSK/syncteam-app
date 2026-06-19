@@ -28,6 +28,9 @@ jobs:
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init "SyncTeam" "com.yourname.syncteam" --web-dir="www"
           npx cap add android
+          
+          # Fix Jetifier signature collision crash by ignoring BouncyCastle
+          echo "android.jetifier.ignorelist=bcprov-jdk18on" >> android/gradle.properties
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
