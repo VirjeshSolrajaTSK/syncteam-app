@@ -1,55 +1,38 @@
-name: Build Android APK
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
 
-on:
-  push:
-    branches:
-      - main
-      - master
-  workflow_dispatch:
+buildscript {
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.7.2'
+        classpath 'com.google.gms:google-services:4.4.2'
+    }
 
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+    configurations.all {
+        resolutionStrategy {
+            force 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+        }
+    }
+}
 
-      - name: Setup Java 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
+apply from: "variables.gradle"
 
-      - name: Verify Java
-        run: |
-          java -version
-          javac -version
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+    configurations.all {
+        resolutionStrategy {
+            force 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+        }
+    }
+}
 
-      - name: Install Dependencies
-        run: npm install
-
-      - name: Sync Capacitor
-        run: npx cap sync android
-
-      - name: Verify Gradle JVM
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew --version
-
-      - name: Build APK
-        run: |
-          cd android
-          ./gradlew assembleDebug --stacktrace
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: syncteam-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
