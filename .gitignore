@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+dist/
+*.log
+*.zip
+*.dmg
+.git/
+.github/workflows/build-artifacts/
