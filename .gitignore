@@ -6,3 +6,4 @@ dist/
 *.dmg
 .git/
 .github/workflows/build-artifacts/
+.npm-cache/

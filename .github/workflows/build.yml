@@ -23,26 +23,13 @@ jobs:
         with:
           node-version: 18
 
-      - name: Prepare Web Directory
+      - name: Install Node Dependencies
         run: |
-          mkdir -p www
-          cp index.html styles.css app.js data.js www/
+          npm install --cache .npm-cache
 
-      - name: Install Dependencies & Setup Capacitor
+      - name: Sync Web Files to Android
         run: |
-          npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "SyncTeam" "com.yourname.syncteam" --web-dir="www"
-          npx cap add android
-          
-          # Fix Jetifier signature collision crash by ignoring BouncyCastle
-          echo "android.jetifier.ignorelist=bcprov-jdk18on" >> android/gradle.properties
-          
-          # Upgrade Gradle wrapper to 8.7 to fix BouncyCastle transformation bug
-          sed -i 's/gradle-8.2.1-all.zip/gradle-8.7-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties
-
-      - name: Sync Capacitor
-        run: npx cap sync
+          npx cap sync
 
       - name: Build Android Debug APK
         run: |

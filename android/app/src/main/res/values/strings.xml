@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SyncTeam</string>
+    <string name="title_activity_main">SyncTeam</string>
+    <string name="package_name">com.virjeshsolraja.syncteam</string>
+    <string name="custom_url_scheme">com.virjeshsolraja.syncteam</string>
+</resources>
