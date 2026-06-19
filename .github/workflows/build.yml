@@ -17,11 +17,16 @@ jobs:
         with:
           node-version: 18
 
+      - name: Prepare Web Directory
+        run: |
+          mkdir -p www
+          cp index.html styles.css app.js data.js www/
+
       - name: Install Dependencies
         run: |
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "SyncTeam" "com.yourname.syncteam" --web-dir="."
+          npx cap init "SyncTeam" "com.yourname.syncteam" --web-dir="www"
           npx cap add android
 
       - name: Set up JDK 17
