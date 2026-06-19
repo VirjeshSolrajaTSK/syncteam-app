@@ -6,15 +6,10 @@ buildscript {
         google()
         mavenCentral()
     }
+
     dependencies {
         classpath 'com.android.tools.build:gradle:8.7.2'
         classpath 'com.google.gms:google-services:4.4.2'
-    }
-
-    configurations.all {
-        resolutionStrategy {
-            force 'org.bouncycastle:bcprov-jdk18on:1.78.1'
-        }
     }
 }
 
@@ -25,14 +20,8 @@ allprojects {
         google()
         mavenCentral()
     }
-
-    configurations.all {
-        resolutionStrategy {
-            force 'org.bouncycastle:bcprov-jdk18on:1.78.1'
-        }
-    }
 }
 
-task clean(type: Delete) {
+tasks.register('clean', Delete) {
     delete rootProject.buildDir
 }
