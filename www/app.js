@@ -53,22 +53,37 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Listen to Team Members
     onSnapshot(collection(db, "users"), (snapshot) => {
-      team = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      renderTeam();
+      try {
+        if (snapshot.empty) { team = []; } 
+        else { team = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); }
+        renderTeam();
+      } catch (err) { console.error("Error processing users:", err); }
+    }, (error) => {
+      console.error("Firestore users listener error:", error);
     });
 
     // Listen to Tasks
     onSnapshot(collection(db, "tasks"), (snapshot) => {
-      tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      renderTasks();
-      renderDashboard();
+      try {
+        if (snapshot.empty) { tasks = []; }
+        else { tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); }
+        renderTasks();
+        renderDashboard();
+      } catch (err) { console.error("Error processing tasks:", err); }
+    }, (error) => {
+      console.error("Firestore tasks listener error:", error);
     });
 
-    // Listen to System Logs (using a central logs collection for now)
+    // Listen to System Logs
     const logsQuery = query(collection(db, "logs"), orderBy("timestamp", "desc"));
     onSnapshot(logsQuery, (snapshot) => {
-      systemLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      renderActivityLog();
+      try {
+        if (snapshot.empty) { systemLogs = []; }
+        else { systemLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); }
+        renderActivityLog();
+      } catch (err) { console.error("Error processing logs:", err); }
+    }, (error) => {
+      console.error("Firestore logs listener error:", error);
     });
   }
 
@@ -885,6 +900,21 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
     }
-  });
+  
 
+    // Send Inquiry Composer trigger
+    if (elements.btnSendInquiry && !elements.btnSendInquiry.hasAttribute('data-initialized')) {
+        elements.btnSendInquiry.setAttribute('data-initialized', 'true');
+        // Let the existing listener handle it or rely on the previous script
+    }
+  }
 
+  // ================= APP INITIALIZATION =================
+  initData();
+  if (typeof startClock === 'function') startClock();
+  if (typeof setupNavigation === 'function') setupNavigation();
+  if (typeof setupGlobalEvents === 'function') setupGlobalEvents();
+  
+  // Start on Dashboard
+  if (typeof switchTab === 'function') switchTab("dashboard");
+});
