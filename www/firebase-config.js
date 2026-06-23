@@ -3,14 +3,15 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, addDoc, onSnapshot, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// TODO: Replace this with your Firebase Project Configuration
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyAebNRwui6s4wXO0mCWpMIc8S8aKJ2SrRg",
+  authDomain: "jiraclone-418be.firebaseapp.com",
+  projectId: "jiraclone-418be",
+  storageBucket: "jiraclone-418be.firebasestorage.app",
+  messagingSenderId: "664494802700",
+  appId: "1:664494802700:web:9368f6193083e0be6aeb29",
+  measurementId: "G-MJPGR4ZFEE"
 };
 
 // Initialize Firebase
