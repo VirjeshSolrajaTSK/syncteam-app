@@ -1,8 +1,15 @@
+// Firebase Integration Imports
+import { app, auth, db, RecaptchaVerifier, signInWithPhoneNumber, collection, addDoc, onSnapshot, query, where, orderBy } from './firebase-config.js';
+import { doc, updateDoc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 // SyncTeam Mobile - Main Application Logic
 // Stored on window or declared globally to support direct file:// protocol usage.
 
 document.addEventListener("DOMContentLoaded", () => {
   // ================= STATE CONFIGURATION =================
+  let currentUser = null;
+  let confirmationResult = null;
+
   let team = [];
   let tasks = [];
   let systemLogs = [];
@@ -13,54 +20,104 @@ document.addEventListener("DOMContentLoaded", () => {
   let activeInquiryChannel = "slack";
   let typingTimeoutId = null;
 
-  // Initialize data from LocalStorage or Fallbacks
+  // ================= FIREBASE AUTH & DATA =================
   function initData() {
-    // Team
-    const savedTeam = localStorage.getItem("sync_team_members");
-    if (savedTeam) {
-      team = JSON.parse(savedTeam);
-    } else {
-      team = [...window.initialTeam];
-      localStorage.setItem("sync_team_members", JSON.stringify(team));
-    }
+    // Listen for Auth State
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        currentUser = user;
+        document.getElementById('login-overlay').classList.add('hidden');
+        setupRealtimeListeners();
+      } else {
+        currentUser = null;
+        document.getElementById('login-overlay').classList.remove('hidden');
+        setupRecaptcha();
+      }
+    });
+  }
 
-    // Tasks
-    const savedTasks = localStorage.getItem("sync_team_tasks");
-    if (savedTasks) {
-      tasks = JSON.parse(savedTasks);
-    } else {
-      tasks = [...window.initialTasks];
-      localStorage.setItem("sync_team_tasks", JSON.stringify(tasks));
-    }
-
-    // System Logs
-    const savedLogs = localStorage.getItem("sync_system_logs");
-    if (savedLogs) {
-      systemLogs = JSON.parse(savedLogs);
-    } else {
-      systemLogs = [];
-      tasks.forEach(task => {
-        if (task.history) {
-          task.history.forEach(h => {
-            systemLogs.push({
-              id: `log-${Math.random().toString(36).substr(2, 9)}`,
-              timestamp: h.timestamp,
-              type: h.type === "system" ? "create" : "update",
-              message: `${h.message} (Task: "${task.title}")`
-            });
-          });
+  function setupRecaptcha() {
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'normal',
+        'callback': (response) => {
+          // reCAPTCHA solved
         }
       });
-      systemLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      localStorage.setItem("sync_system_logs", JSON.stringify(systemLogs));
+      window.recaptchaVerifier.render();
     }
   }
 
-  // Save states helper
-  function saveState(key, data) {
-    localStorage.setItem(key, JSON.stringify(data));
+  function setupRealtimeListeners() {
+    if (!currentUser) return;
+    
+    // Listen to Team Members
+    onSnapshot(collection(db, "users"), (snapshot) => {
+      team = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      renderTeam();
+    });
+
+    // Listen to Tasks
+    onSnapshot(collection(db, "tasks"), (snapshot) => {
+      tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      renderTasks();
+      renderDashboard();
+    });
+
+    // Listen to System Logs (using a central logs collection for now)
+    const logsQuery = query(collection(db, "logs"), orderBy("timestamp", "desc"));
+    onSnapshot(logsQuery, (snapshot) => {
+      systemLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      renderActivityLog();
+    });
   }
 
+  // Auth Event Listeners
+  document.getElementById('btn-send-otp').addEventListener('click', () => {
+    const phoneNumber = document.getElementById('phone-number').value;
+    const appVerifier = window.recaptchaVerifier;
+    signInWithPhoneNumber(auth, phoneNumber, appVerifier)
+      .then((confResult) => {
+        confirmationResult = confResult;
+        document.getElementById('step-phone').classList.remove('active');
+        document.getElementById('step-phone').classList.add('hidden');
+        document.getElementById('step-otp').classList.remove('hidden');
+        document.getElementById('step-otp').classList.add('active');
+      }).catch((error) => {
+        alert("Error sending OTP: " + error.message);
+      });
+  });
+
+  document.getElementById('btn-verify-otp').addEventListener('click', () => {
+    const code = document.getElementById('otp-code').value;
+    confirmationResult.confirm(code).then((result) => {
+      // User signed in successfully
+      // Save user profile if new
+      setDoc(doc(db, "users", result.user.uid), {
+        phoneNumber: result.user.phoneNumber,
+        name: result.user.phoneNumber, // Default name to phone
+        role: "Team Member"
+      }, { merge: true });
+    }).catch((error) => {
+      alert("Invalid OTP: " + error.message);
+    });
+  });
+
+  document.getElementById('btn-back-phone').addEventListener('click', () => {
+    document.getElementById('step-otp').classList.remove('active');
+    document.getElementById('step-otp').classList.add('hidden');
+    document.getElementById('step-phone').classList.remove('hidden');
+    document.getElementById('step-phone').classList.add('active');
+  });
+
+  async function logActivity(type, message) {
+    await addDoc(collection(db, "logs"), {
+      timestamp: new Date().toISOString(),
+      type,
+      message,
+      userId: currentUser ? currentUser.uid : null
+    });
+  }
   // ================= DOM ELEMENT CACHE =================
   const elements = {
     // Navigation & OS Status Clock
@@ -656,7 +713,7 @@ document.addEventListener("DOMContentLoaded", () => {
     elements.modalTask.classList.remove("show");
   }
 
-  function saveTask(e) {
+  async function saveTask(e) {
     e.preventDefault();
     const id = elements.taskIdInput.value;
     const title = elements.taskTitleInput.value.trim();
@@ -669,80 +726,50 @@ document.addEventListener("DOMContentLoaded", () => {
     const assignee = assigneeId ? getMember(assigneeId) : null;
     const assigneeName = assignee ? assignee.name : "Entire Team";
 
-    if (id) {
-      // Update Task
-      const taskIndex = tasks.findIndex(t => t.id === id);
-      if (taskIndex !== -1) {
-        const oldTask = tasks[taskIndex];
-        const statusChanged = oldTask.status !== status;
-        const assigneeChanged = oldTask.assigneeId !== assigneeId;
-
-        tasks[taskIndex] = {
-          ...oldTask,
-          title,
-          description,
-          priority,
-          status,
-          assigneeId,
-          dueDate
-        };
-
+    try {
+      if (id) {
+        // Update Task
+        const taskRef = doc(db, "tasks", id);
+        const taskIndex = tasks.findIndex(t => t.id === id);
+        const oldTask = taskIndex !== -1 ? tasks[taskIndex] : {};
+        
         let changeMsg = `Task "${title}" updated.`;
-        if (statusChanged) changeMsg += ` Status updated to ${status.replace("_", " ")}.`;
-        if (assigneeChanged) changeMsg += ` Assigned to ${assigneeName}.`;
+        if (oldTask.status !== status) changeMsg += ` Status updated to ${status.replace("_", " ")}.`;
+        if (oldTask.assigneeId !== assigneeId) changeMsg += ` Assigned to ${assigneeName}.`;
 
-        tasks[taskIndex].history.push({
-          id: `hist-${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: new Date().toISOString(),
-          type: "status_update",
-          message: changeMsg
+        await updateDoc(taskRef, {
+          title, description, priority, status, assigneeId, dueDate
         });
-
+        
         logActivity("update", changeMsg);
+      } else {
+        // Create Task
+        await addDoc(collection(db, "tasks"), {
+          title, description, priority, status, assigneeId, dueDate,
+          dateCreated: new Date().toISOString().split("T")[0],
+          creatorId: currentUser ? currentUser.uid : null
+        });
+        
+        logActivity("create", `Task "${title}" created and assigned to ${assigneeName}.`);
       }
-    } else {
-      // Create Task
-      const newId = `task-${Math.random().toString(36).substr(2, 9)}`;
-      const newTask = {
-        id: newId,
-        title,
-        description,
-        priority,
-        status,
-        assigneeId,
-        dueDate,
-        dateCreated: new Date().toISOString().split("T")[0],
-        history: [
-          {
-            id: `hist-${Math.random().toString(36).substr(2, 9)}`,
-            timestamp: new Date().toISOString(),
-            type: "system",
-            message: `Task created and assigned to ${assigneeName}`
-          }
-        ]
-      };
-      tasks.push(newTask);
-      logActivity("create", `Task "${title}" created and assigned to ${assigneeName}.`);
+    } catch (error) {
+      console.error("Error saving task: ", error);
+      alert("Failed to save task.");
     }
 
-    saveState("sync_team_tasks", tasks);
     closeTaskModal();
-    
-    if (activeTab === "dashboard") renderDashboard();
-    else renderTasks();
-  }
 
-  function deleteTask(taskId) {
+  async function deleteTask(taskId) {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     
     if (confirm(`Delete the task: "${task.title}"?`)) {
-      tasks = tasks.filter(t => t.id !== taskId);
-      saveState("sync_team_tasks", tasks);
-      logActivity("update", `Task "${task.title}" deleted.`);
-      
-      if (activeTab === "dashboard") renderDashboard();
-      else renderTasks();
+      try {
+        await deleteDoc(doc(db, "tasks", taskId));
+        logActivity("update", `Task "${task.title}" deleted.`);
+      } catch (error) {
+        console.error("Error deleting task: ", error);
+      }
     }
   }
 
@@ -756,405 +783,108 @@ document.addEventListener("DOMContentLoaded", () => {
     elements.modalMember.classList.remove("show");
   }
 
-  function saveMember(e) {
+  async function saveMember(e) {
     e.preventDefault();
     const name = document.getElementById("member-name").value.trim();
     const role = document.getElementById("member-role").value.trim();
     const email = document.getElementById("member-email").value.trim();
-    const timezone = document.getElementById("member-timezone").value;
-    const avatarColor = document.querySelector('input[name="avatar-color"]:checked').value;
 
-    if (team.some(m => m.email.toLowerCase() === email.toLowerCase())) {
-      alert("A team member with this email address already exists.");
-      return;
+    try {
+      await addDoc(collection(db, "users"), {
+        name, role, email,
+        avatarColor: "#" + Math.floor(Math.random()*16777215).toString(16),
+        status: "online"
+      });
+      logActivity("create", `Team member "${name}" added.`);
+    } catch (error) {
+      console.error("Error adding member: ", error);
     }
 
-    const newMember = {
-      id: `tm-${Math.random().toString(36).substr(2, 9)}`,
-      name,
-      role,
-      email,
-      timezone,
-      avatarColor,
-      status: "active"
-    };
-
-    team.push(newMember);
-    saveState("sync_team_members", team);
-    logActivity("create", `Added team member: ${name} (${role})`);
     closeMemberModal();
-
-    if (activeTab === "team") renderTeam();
-    else if (activeTab === "dashboard") renderDashboard();
   }
 
-  function deleteMember(memberId) {
+  async function deleteMember(memberId) {
     const member = team.find(m => m.id === memberId);
     if (!member) return;
+    
+    if (confirm(`Remove team member: "${member.name}"?`)) {
+      try {
+        await deleteDoc(doc(db, "users", memberId));
+        logActivity("update", `Team member "${member.name}" removed.`);
+      } catch (error) {
+        console.error("Error removing member:", error);
+      }
+    }
+  }
 
-    if (confirm(`Remove "${member.name}" from directory? Assigned tasks will become unassigned.`)) {
-      tasks = tasks.map(t => {
-        if (t.assigneeId === memberId) {
-          return {
-            ...t,
-            assigneeId: null,
-            history: [
-              ...t.history,
-              {
-                id: `hist-${Math.random().toString(36).substr(2, 9)}`,
-                timestamp: new Date().toISOString(),
-                type: "system",
-                message: `Assignee removed (formerly ${member.name})`
-              }
-            ]
-          };
+  elements.btnSendInquiry.addEventListener("click", async () => {
+    if (!activeInquiryTaskId) return;
+    const msg = elements.inquiryDraft.value.trim();
+    if (!msg) return;
+
+    elements.inquiryDraft.value = "";
+
+    try {
+      await addDoc(collection(db, "messages"), {
+        taskId: activeInquiryTaskId,
+        senderId: currentUser ? currentUser.uid : "user",
+        senderName: currentUser && currentUser.phoneNumber ? currentUser.phoneNumber : "Me",
+        content: msg,
+        timestamp: new Date().toISOString()
+      });
+      // The onSnapshot listener will handle rendering
+    } catch (error) {
+      console.error("Error sending message: ", error);
+    }
+  });
+
+  // Global listener for messages to handle Local Notifications
+  let isFirstLoadMessages = true;
+  onSnapshot(query(collection(db, "messages"), orderBy("timestamp", "asc")), async (snapshot) => {
+    const allMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Check for new incoming messages for local notifications
+    if (!isFirstLoadMessages && snapshot.docChanges().length > 0) {
+      for (const change of snapshot.docChanges()) {
+        if (change.type === "added") {
+          const msg = change.doc.data();
+          if (msg.senderId !== (currentUser ? currentUser.uid : "user")) {
+            // Trigger Local Notification
+            if (window.Capacitor && window.Capacitor.Plugins.LocalNotifications) {
+              await window.Capacitor.Plugins.LocalNotifications.schedule({
+                notifications: [{
+                  title: "New Status Update",
+                  body: `${msg.senderName}: ${msg.content}`,
+                  id: new Date().getTime(),
+                  schedule: { at: new Date(Date.now() + 1000) }
+                }]
+              });
+            } else if ("Notification" in window && Notification.permission === "granted") {
+              new Notification("New Status Update", { body: `${msg.senderName}: ${msg.content}` });
+            }
+          }
         }
-        return t;
-      });
-
-      team = team.filter(m => m.id !== memberId);
-      saveState("sync_team_members", team);
-      saveState("sync_team_tasks", tasks);
-      logActivity("update", `Removed team member: ${member.name}`);
-
-      if (activeTab === "team") renderTeam();
-      else if (activeTab === "dashboard") renderDashboard();
-    }
-  }
-
-  // ================= INQUIRY SIMULATION WORKFLOW =================
-  function openInquiryModal(taskId) {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-
-    if (!task.assigneeId) {
-      alert(`The task "${task.title}" is currently unassigned. Please assign it to a team member before requesting status.`);
-      openTaskModal(taskId);
-      return;
-    }
-
-    const assignee = getMember(task.assigneeId);
-    if (!assignee) {
-      alert("Error finding assignee details.");
-      return;
-    }
-
-    activeInquiryTaskId = taskId;
-    
-    // Set headers
-    elements.inquiryTaskTitle.textContent = task.title;
-    elements.inquiryRecipientName.textContent = assignee.name;
-    elements.inquiryRecipientRole.textContent = assignee.role;
-    elements.inquiryRecipientAvatar.style.backgroundColor = assignee.avatarColor;
-    elements.inquiryRecipientAvatar.textContent = getInitials(assignee.name);
-    
-    // Populate draft message and active channel elements
-    changeInquiryChannel(activeInquiryChannel);
-
-    // Reset Chat viewport
-    elements.chatMessages.innerHTML = "";
-    elements.chatTypingContainer.classList.add("hidden");
-    elements.chatActions.classList.add("hidden");
-
-    // Load Chat History
-    const prevInquiries = task.history.filter(h => h.type === "inquiry_outbound" || h.type === "inquiry_inbound");
-    
-    if (prevInquiries.length === 0) {
-      elements.chatMessages.innerHTML = `
-        <div class="chat-empty-state" id="chat-empty-state" style="padding-top: 60px;">
-          <i data-lucide="message-square" class="empty-icon" style="width: 32px; height: 32px;"></i>
-          <p style="font-size: 0.75rem;">Send a status request. ${assignee.name} will reply shortly.</p>
-        </div>
-      `;
-      lucide.createIcons();
-    } else {
-      prevInquiries.forEach(msg => {
-        appendChatBubble(
-          msg.type === "inquiry_outbound" ? "outbound" : "inbound", 
-          msg.message, 
-          msg.timestamp
-        );
-      });
-    }
-
-    elements.modalInquiry.classList.add("show");
-  }
-
-  function closeInquiryModal() {
-    elements.modalInquiry.classList.remove("show");
-    if (typingTimeoutId) {
-      clearTimeout(typingTimeoutId);
-      typingTimeoutId = null;
-    }
-  }
-
-  function updateDraftMessage(name, title) {
-    const greeting = activeInquiryChannel === "email" ? `Dear ${name},` : `Hi ${name} 👋`;
-    const body = `Can you give me a status update on "${title}"? Let me know if there are any blockers or estimate.`;
-    const signoff = activeInquiryChannel === "email" ? `\n\nBest,\nPM` : "";
-    
-    elements.inquiryDraft.value = `${greeting}\n\n${body}${signoff}`;
-  }
-
-  function changeInquiryChannel(channel) {
-    activeInquiryChannel = channel;
-    
-    // Update input panel tabs
-    elements.channelBtns.forEach(btn => {
-      btn.classList.remove("active");
-      if (btn.getAttribute("data-channel") === channel) {
-        btn.classList.add("active");
-      }
-    });
-
-    // Update active channel header badge
-    elements.activeChannelName.textContent = channel.charAt(0).toUpperCase() + channel.slice(1);
-    
-    let lucideIcon = "message-square";
-    if (channel === "email") lucideIcon = "mail";
-    else if (channel === "teams") lucideIcon = "users-2";
-    
-    elements.activeChannelIcon.setAttribute("data-lucide", lucideIcon);
-    lucide.createIcons();
-
-    const task = tasks.find(t => t.id === activeInquiryTaskId);
-    if (task) {
-      const assignee = getMember(task.assigneeId);
-      if (assignee) {
-        updateDraftMessage(assignee.name, task.title);
       }
     }
-  }
+    isFirstLoadMessages = false;
 
-  function sendInquiryRequest() {
-    const taskIndex = tasks.findIndex(t => t.id === activeInquiryTaskId);
-    if (taskIndex === -1) return;
-
-    const task = tasks[taskIndex];
-    const assignee = getMember(task.assigneeId);
-    const messageContent = elements.inquiryDraft.value.trim();
-
-    if (!messageContent) return;
-
-    const emptyState = document.getElementById("chat-empty-state");
-    if (emptyState) emptyState.remove();
-
-    const timestamp = new Date().toISOString();
-
-    // 1. Post PM message
-    appendChatBubble("outbound", messageContent, timestamp);
-    
-    task.history.push({
-      id: `hist-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp,
-      type: "inquiry_outbound",
-      message: messageContent
-    });
-
-    logActivity("inquiry", `Inquiry sent to ${assignee.name} (${activeInquiryChannel.toUpperCase()}) for "${task.title}".`);
-
-    // Disable composer send
-    elements.btnSendInquiry.disabled = true;
-    elements.btnSendInquiry.style.opacity = 0.5;
-
-    // 2. Show typing indicator overlay row
-    elements.chatTypingContainer.classList.remove("hidden");
-    elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-
-    // 3. Simulate delay
-    typingTimeoutId = setTimeout(() => {
-      elements.chatTypingContainer.classList.add("hidden");
-
-      const replyOptions = window.statusReplies[task.status]?.[task.priority] || 
-                           window.statusReplies["in_progress"]["medium"];
+    // Render if chat is open
+    if (activeInquiryTaskId) {
+      const taskMessages = allMessages.filter(m => m.taskId === activeInquiryTaskId);
       
-      const randomReply = replyOptions[Math.floor(Math.random() * replyOptions.length)];
-      const responseTime = new Date().toISOString();
-
-      // Post assignee reply bubble
-      appendChatBubble("inbound", randomReply, responseTime);
-      
-      task.history.push({
-        id: `hist-${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: responseTime,
-        type: "inquiry_inbound",
-        message: randomReply
+      elements.chatMessages.innerHTML = "";
+      taskMessages.forEach(msg => {
+        const isMe = msg.senderId === (currentUser ? currentUser.uid : "user");
+        const msgDiv = document.createElement("div");
+        msgDiv.className = `chat-message ${isMe ? 'message-sent' : 'message-received'}`;
+        msgDiv.innerHTML = `
+          <div class="message-bubble">${msg.content}</div>
+          <div class="message-meta">${new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+        `;
+        elements.chatMessages.appendChild(msgDiv);
       });
-
-      logActivity("response", `Status reply from ${assignee.name}: "${randomReply}"`);
-      saveState("sync_team_tasks", tasks);
-
       elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-
-      // Re-enable composer
-      elements.btnSendInquiry.disabled = false;
-      elements.btnSendInquiry.style.opacity = 1;
-
-      // 4. Reveal Action options
-      revealChatActions(randomReply, task.status);
-
-      if (activeTab === "dashboard") renderDashboard();
-
-    }, 2200);
-  }
-
-  function appendChatBubble(direction, text, timestamp) {
-    const formattedTime = getFormattedTimestamp(timestamp);
-    const bubble = document.createElement("div");
-    bubble.className = `message-bubble ${direction}`;
-    bubble.innerHTML = `
-      <div>${text.replace(/\n/g, "<br>")}</div>
-      <span class="message-time">${formattedTime}</span>
-    `;
-    elements.chatMessages.appendChild(bubble);
-    elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-  }
-
-  function revealChatActions(replyText, currentStatus) {
-    elements.chatActions.classList.remove("hidden");
-    elements.btnApplyStatusUpdate.className = "btn btn-primary btn-sm btn-accent-action";
-    
-    let targetStatus = null;
-    let buttonLabel = "Change Status";
-
-    const lowerReply = replyText.toLowerCase();
-
-    if (lowerReply.includes("blocked") || lowerReply.includes("roadblock") || lowerReply.includes("devops") || lowerReply.includes("access")) {
-      targetStatus = "blocked";
-      buttonLabel = 'Mark Blocked';
-      elements.btnApplyStatusUpdate.classList.add("val-blocked-accent");
-    } else if (lowerReply.includes("completed") || lowerReply.includes("done") || lowerReply.includes("finished") || lowerReply.includes("merged")) {
-      targetStatus = "done";
-      buttonLabel = 'Mark Completed';
-    } else if (currentStatus === "todo") {
-      targetStatus = "in_progress";
-      buttonLabel = 'Start Task';
     }
+  });
 
-    if (targetStatus && targetStatus !== currentStatus) {
-      elements.btnApplyStatusUpdate.style.display = "inline-flex";
-      elements.btnApplyStatusUpdate.innerHTML = `<i data-lucide="refresh-cw" style="width:11px;height:11px;"></i> ${buttonLabel}`;
-      elements.btnApplyStatusUpdate.onclick = () => {
-        applyStatusUpdate(targetStatus);
-      };
-    } else {
-      elements.btnApplyStatusUpdate.style.display = "none";
-    }
 
-    elements.btnApplyLogReply.onclick = () => {
-      logReplyAsComment(replyText);
-    };
-
-    lucide.createIcons();
-  }
-
-  function applyStatusUpdate(newStatus) {
-    const taskIndex = tasks.findIndex(t => t.id === activeInquiryTaskId);
-    if (taskIndex === -1) return;
-
-    const task = tasks[taskIndex];
-    const oldStatus = task.status;
-    task.status = newStatus;
-
-    const statusMsg = `Status updated from ${oldStatus.replace("_", " ")} to ${newStatus.replace("_", " ")} via status inquiry.`;
-    task.history.push({
-      id: `hist-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date().toISOString(),
-      type: "status_update",
-      message: statusMsg
-    });
-
-    logActivity("update", `Task "${task.title}": ${statusMsg}`);
-    saveState("sync_team_tasks", tasks);
-    closeInquiryModal();
-
-    if (activeTab === "tasks") renderTasks();
-    else if (activeTab === "dashboard") renderDashboard();
-  }
-
-  function logReplyAsComment(replyText) {
-    const taskIndex = tasks.findIndex(t => t.id === activeInquiryTaskId);
-    if (taskIndex === -1) return;
-
-    const task = tasks[taskIndex];
-    
-    task.history.push({
-      id: `hist-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date().toISOString(),
-      type: "comment",
-      message: `Status comment: "${replyText}"`
-    });
-
-    logActivity("update", `Task "${task.title}": Comment logged from status reply.`);
-    saveState("sync_team_tasks", tasks);
-    closeInquiryModal();
-
-    if (activeTab === "tasks") renderTasks();
-    else if (activeTab === "dashboard") renderDashboard();
-  }
-
-  // ================= GENERAL GLOBAL BINDINGS =================
-  function setupGlobalEvents() {
-    // Filters bar
-    elements.filterStatus.addEventListener("change", renderTasks);
-    elements.filterPriority.addEventListener("change", renderTasks);
-    elements.filterAssignee.addEventListener("change", renderTasks);
-
-    // Global search triggers panel switch to task feed
-    elements.globalSearch.addEventListener("keyup", () => {
-      if (activeTab !== "tasks") {
-        switchTab("tasks");
-      } else {
-        renderTasks();
-      }
-    });
-
-    // Opening sheets
-    elements.btnAddTask.addEventListener("click", () => openTaskModal());
-    elements.btnQuickTask.addEventListener("click", () => openTaskModal());
-    elements.btnAddMember.addEventListener("click", openMemberModal);
-
-    // Sheet Cancels & Closes
-    elements.btnCancelTask.addEventListener("click", closeTaskModal);
-    elements.btnCloseTaskModal.addEventListener("click", closeTaskModal);
-
-    elements.btnCancelMember.addEventListener("click", closeMemberModal);
-    elements.btnCloseMemberModal.addEventListener("click", closeMemberModal);
-
-    elements.btnCloseInquiryModal.addEventListener("click", closeInquiryModal);
-
-    // Form Submissions
-    elements.taskForm.addEventListener("submit", saveTask);
-    elements.memberForm.addEventListener("submit", saveMember);
-
-    // Clear history logs
-    elements.btnClearLogs.addEventListener("click", () => {
-      if (confirm("Clear all logs and activity history?")) {
-        systemLogs = [];
-        saveState("sync_system_logs", systemLogs);
-        renderActivityLog();
-        renderDashboard();
-      }
-    });
-
-    // Inquiry channel buttons inside composer panel
-    elements.channelBtns.forEach(btn => {
-      btn.addEventListener("click", () => {
-        const channel = btn.getAttribute("data-channel");
-        changeInquiryChannel(channel);
-      });
-    });
-
-    // Send Inquiry Composer trigger
-    elements.btnSendInquiry.addEventListener("click", sendInquiryRequest);
-  }
-
-  // ================= APP INITIALIZATION =================
-  initData();
-  startClock();
-  setupNavigation();
-  setupGlobalEvents();
-  
-  // Start on Dashboard
-  switchTab("dashboard");
-});
