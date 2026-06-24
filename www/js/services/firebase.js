@@ -1,7 +1,7 @@
 // firebase-config.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, where, orderBy, doc, setDoc, updateDoc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -20,4 +20,4 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // Export instances to be used in app.js
-export { app, auth, db, RecaptchaVerifier, signInWithPhoneNumber, collection, addDoc, onSnapshot, query, where, orderBy };
+export { app, auth, db, RecaptchaVerifier, signInWithPhoneNumber, collection, addDoc, onSnapshot, query, where, orderBy, doc, setDoc, updateDoc, getDoc, getDocs };

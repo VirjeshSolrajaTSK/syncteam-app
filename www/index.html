@@ -1,506 +1,222 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark-mode">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SyncTeam Mobile Task Tracker</title>
-  <!-- Google Fonts: Inter and Outfit -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>SyncTeam V2</title>
+
+    <!-- Base Styles -->
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="stylesheet" href="css/login.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/tasks.css">
+    <link rel="stylesheet" href="css/activity.css">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 </head>
 <body>
-  <!-- Centered Mobile Frame Viewport wrapper -->
-  <div class="mobile-container">
-    <div class="mobile-viewport">
-      
-      <!-- 1. Simulated Mobile OS Status Bar -->
-      <div class="mobile-status-bar">
-        <span class="status-bar-time" id="status-clock">23:11</span>
-        <div class="status-bar-icons">
-          <i data-lucide="signal" class="sb-icon"></i>
-          <i data-lucide="wifi" class="sb-icon"></i>
-          <i data-lucide="battery" class="sb-icon"></i>
+    
+    <!-- Loading Screen (App Boot) -->
+    <div id="app-boot-screen" class="full-screen-loader active">
+        <div class="loader-content">
+            <span class="material-icons-round icon-spin">sync</span>
+            <p>Starting SyncTeam...</p>
         </div>
-      </div>
+    </div>
 
-      <!-- Login Overlay -->
-      <div id="login-overlay" class="login-overlay">
+    <!-- Login Screen Flow -->
+    <div id="login-screen" class="screen full-screen">
         <div class="login-container">
-          <div class="login-brand">
-            <div class="brand-logo login-logo">
-              <i data-lucide="layers" class="brand-icon"></i>
-            </div>
-            <h2>SyncTeam</h2>
-            <p>Sign in to your workspace</p>
-          </div>
-          
-          <div id="step-phone" class="login-step active">
-            <div class="input-group">
-              <label for="phone-number">Phone Number</label>
-              <input type="tel" id="phone-number" placeholder="+1 234 567 8900" />
-            </div>
-            <div class="input-group">
-              <label for="email-optional">Email (Optional for notifications)</label>
-              <input type="email" id="email-optional" placeholder="you@company.com" />
-            </div>
-            <div id="recaptcha-container"></div>
-            <button class="btn btn-primary btn-full" id="btn-send-otp">Send Code</button>
-          </div>
-
-          <div id="step-otp" class="login-step hidden">
-            <div class="input-group">
-              <label for="otp-code">Verification Code</label>
-              <input type="text" id="otp-code" placeholder="123456" />
-            </div>
-            <button class="btn btn-primary btn-full" id="btn-verify-otp">Verify & Sign In</button>
-            <button class="btn btn-secondary btn-full" id="btn-back-phone" style="margin-top: 10px;">Back</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 2. Application Main Header -->
-      <header class="app-header">
-        <div class="header-brand">
-          <div class="brand-logo">
-            <i data-lucide="layers" class="brand-icon"></i>
-          </div>
-          <h2>SyncTeam</h2>
-        </div>
-        <div class="header-actions">
-          <button class="header-btn" id="btn-quick-task" title="New Task">
-            <i data-lucide="plus"></i>
-          </button>
-          <div class="user-avatar-main">
-            <span>PM</span>
-          </div>
-        </div>
-      </header>
-
-      <!-- 3. Scrollable Panel Container -->
-      <div class="app-content">
-        
-        <!-- Dashboard Panel -->
-        <section class="content-panel active" id="panel-dashboard">
-          <div class="panel-intro">
-            <h3>Project Hub</h3>
-            <p>Real-time status breakdown and workloads</p>
-          </div>
-
-          <!-- Compact Stats Grid (2x2) -->
-          <div class="metrics-grid">
-            <div class="metric-card">
-              <div class="metric-icon val-todo">
-                <i data-lucide="circle"></i>
-              </div>
-              <div class="metric-info">
-                <span class="metric-label">Todo</span>
-                <span class="metric-number" id="metric-todo">0</span>
-              </div>
-            </div>
-            
-            <div class="metric-card">
-              <div class="metric-icon val-progress">
-                <i data-lucide="play-circle"></i>
-              </div>
-              <div class="metric-info">
-                <span class="metric-label">Active</span>
-                <span class="metric-number" id="metric-progress">0</span>
-              </div>
-            </div>
-            
-            <div class="metric-card">
-              <div class="metric-icon val-blocked">
-                <i data-lucide="alert-octagon"></i>
-              </div>
-              <div class="metric-info">
-                <span class="metric-label">Blocked</span>
-                <span class="metric-number" id="metric-blocked">0</span>
-              </div>
-            </div>
-            
-            <div class="metric-card">
-              <div class="metric-icon val-done">
-                <i data-lucide="check-circle2"></i>
-              </div>
-              <div class="metric-info">
-                <span class="metric-label">Done</span>
-                <span class="metric-number" id="metric-done">0</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Section: Workloads -->
-          <div class="section-card">
-            <div class="section-header">
-              <h4>Workload Index</h4>
-              <span>Active tasks</span>
-            </div>
-            <div class="workload-list" id="workload-container">
-              <!-- Dynamically populated -->
-            </div>
-          </div>
-
-          <!-- Section: Recent Status Updates -->
-          <div class="section-card">
-            <div class="section-header">
-              <h4>Recent Inquiries</h4>
-              <a href="#" class="view-all-link" id="link-view-all-activity">View History</a>
-            </div>
-            <div class="activity-timeline" id="recent-inquiries-container">
-              <!-- Dynamically populated -->
-            </div>
-          </div>
-        </section>
-
-        <!-- Tasks Panel -->
-        <section class="content-panel" id="panel-tasks">
-          <div class="panel-intro-row">
-            <div>
-              <h3>Task Board</h3>
-              <p>Assign tasks and verify status</p>
-            </div>
-            <button class="btn btn-primary btn-sm" id="btn-add-task">
-              <i data-lucide="plus-circle"></i>
-              <span>Add Task</span>
-            </button>
-          </div>
-
-          <!-- Mobile Search & Filter Toolbar -->
-          <div class="search-filter-toolbar">
-            <div class="search-box">
-              <i data-lucide="search"></i>
-              <input type="text" id="global-search" placeholder="Search tasks or assignees...">
-            </div>
-            
-            <div class="compact-filters">
-              <select id="filter-status">
-                <option value="all">All States</option>
-                <option value="todo">Todo</option>
-                <option value="in_progress">In Progress</option>
-                <option value="blocked">Blocked</option>
-                <option value="done">Completed</option>
-              </select>
-
-              <select id="filter-priority">
-                <option value="all">All Priorities</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-
-              <select id="filter-assignee">
-                <option value="all">Everyone</option>
-                <option value="unassigned">Unassigned</option>
-                <!-- Dynamically populated -->
-              </select>
-            </div>
-          </div>
-
-          <!-- Tasks list container -->
-          <div class="tasks-feed" id="tasks-container">
-            <!-- Dynamically populated -->
-          </div>
-        </section>
-
-        <!-- Team Panel -->
-        <section class="content-panel" id="panel-team">
-          <div class="panel-intro-row">
-            <div>
-              <h3>Team Roster</h3>
-              <p>Manage members and timezone syncs</p>
-            </div>
-            <button class="btn btn-primary btn-sm" id="btn-add-member">
-              <i data-lucide="user-plus"></i>
-              <span>Add</span>
-            </button>
-          </div>
-
-          <div class="team-feed" id="team-container">
-            <!-- Dynamically populated -->
-          </div>
-        </section>
-
-        <!-- Activity Log Panel -->
-        <section class="content-panel" id="panel-activity">
-          <div class="panel-intro-row">
-            <div>
-              <h3>Activity Log</h3>
-              <p>Chronological tracking events</p>
-            </div>
-            <button class="btn btn-secondary btn-sm" id="btn-clear-logs">Clear</button>
-          </div>
-
-          <div class="logs-feed-card">
-            <ul class="log-list" id="log-container">
-              <!-- Dynamically populated -->
-            </ul>
-          </div>
-        </section>
-
-      </div>
-
-      <!-- 4. Pinned Bottom Navigation Tab Bar -->
-      <nav class="bottom-nav">
-        <a href="#" class="bottom-nav-item active" data-tab="dashboard">
-          <i data-lucide="layout-dashboard"></i>
-          <span>Dashboard</span>
-        </a>
-        <a href="#" class="bottom-nav-item" data-tab="tasks">
-          <i data-lucide="check-square"></i>
-          <span>Tasks</span>
-        </a>
-        <a href="#" class="bottom-nav-item" data-tab="team">
-          <i data-lucide="users"></i>
-          <span>Team</span>
-        </a>
-        <a href="#" class="bottom-nav-item" data-tab="activity">
-          <i data-lucide="activity"></i>
-          <span>Activity</span>
-        </a>
-      </nav>
-
-      <!-- ================= SLIDE-UP MODAL OVERLAYS ================= -->
-
-      <!-- 1. Add / Edit Task Modal (Slide-up Sheet) -->
-      <div class="mobile-sheet" id="modal-task">
-        <div class="sheet-dimmer"></div>
-        <div class="sheet-content">
-          <div class="sheet-drag-handle"></div>
-          <div class="sheet-header">
-            <h3 id="task-modal-title">Create Task</h3>
-            <button class="btn-close-sheet" id="btn-close-task-modal">
-              <i data-lucide="x"></i>
-            </button>
-          </div>
-          
-          <form id="task-form">
-            <input type="hidden" id="task-id">
-            
-            <div class="form-group">
-              <label for="task-title" class="required">Task Title</label>
-              <input type="text" id="task-title" required placeholder="e.g., Fix mobile login crash">
-            </div>
-            
-            <div class="form-group">
-              <label for="task-description">Description</label>
-              <textarea id="task-description" rows="3" placeholder="Provide details about requirements..."></textarea>
+            <div class="login-header">
+                <span class="material-icons-round logo-icon">group_work</span>
+                <h1>SyncTeam</h1>
+                <p>Manager-to-Team Execution Platform</p>
             </div>
 
-            <div class="form-row">
-              <div class="form-group col-6">
-                <label for="task-priority" class="required">Priority</label>
-                <select id="task-priority" required>
-                  <option value="low">Low</option>
-                  <option value="medium" selected>Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </div>
-              
-              <div class="form-group col-6">
-                <label for="task-status" class="required">Status</label>
-                <select id="task-status" required>
-                  <option value="todo" selected>Todo</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="blocked">Blocked</option>
-                  <option value="done">Completed</option>
-                </select>
-              </div>
+            <!-- Phone Entry Step -->
+            <div id="step-phone" class="auth-step active">
+                <label>Mobile Number</label>
+                <input type="tel" id="input-phone" placeholder="+1 234 567 8900">
+                <div id="recaptcha-container"></div>
+                <button id="btn-send-otp" class="btn-primary">Continue</button>
             </div>
 
-            <div class="form-row">
-              <div class="form-group col-6">
-                <label for="task-assignee">Assignee</label>
-                <select id="task-assignee">
-                  <option value="">Team (Unassigned)</option>
-                  <!-- Dynamically populated -->
-                </select>
-              </div>
-              
-              <div class="form-group col-6">
-                <label for="task-due-date" class="required">Due Date</label>
-                <input type="date" id="task-due-date" required>
-              </div>
-            </div>
-
-            <div class="sheet-footer">
-              <button type="button" class="btn btn-secondary col-6" id="btn-cancel-task">Cancel</button>
-              <button type="submit" class="btn btn-primary col-6" id="btn-save-task">Save Task</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- 2. Add Team Member Modal (Slide-up Sheet) -->
-      <div class="mobile-sheet" id="modal-member">
-        <div class="sheet-dimmer"></div>
-        <div class="sheet-content">
-          <div class="sheet-drag-handle"></div>
-          <div class="sheet-header">
-            <h3>Add Team Member</h3>
-            <button class="btn-close-sheet" id="btn-close-member-modal">
-              <i data-lucide="x"></i>
-            </button>
-          </div>
-          
-          <form id="member-form">
-            <div class="form-group">
-              <label for="member-name" class="required">Full Name</label>
-              <input type="text" id="member-name" required placeholder="e.g., Alex Rivera">
-            </div>
-            
-            <div class="form-group">
-              <label for="member-role" class="required">Role</label>
-              <input type="text" id="member-role" required placeholder="e.g., UI Designer">
-            </div>
-
-            <div class="form-group">
-              <label for="member-email" class="required">Email</label>
-              <input type="email" id="member-email" required placeholder="e.g., alex@company.com">
-            </div>
-
-            <div class="form-row">
-              <div class="form-group col-6">
-                <label for="member-timezone" class="required">Timezone</label>
-                <select id="member-timezone" required>
-                  <option value="GMT-8">GMT-8 (PST)</option>
-                  <option value="GMT-5" selected>GMT-5 (EST)</option>
-                  <option value="GMT">GMT (London)</option>
-                  <option value="GMT+1">GMT+1 (Berlin)</option>
-                  <option value="GMT+2">GMT+2 (Athens)</option>
-                  <option value="GMT+5:30">GMT+5:30 (India)</option>
-                  <option value="GMT+8">GMT+8 (Singapore)</option>
-                  <option value="GMT+10">GMT+10 (Sydney)</option>
-                </select>
-              </div>
-              
-              <div class="form-group col-6">
-                <label class="required">Profile Color</label>
-                <div class="color-picker-grid">
-                  <input type="radio" name="avatar-color" value="#8b5cf6" id="col-1" checked><label for="col-1" style="background: #8b5cf6;"></label>
-                  <input type="radio" name="avatar-color" value="#3b82f6" id="col-2"><label for="col-2" style="background: #3b82f6;"></label>
-                  <input type="radio" name="avatar-color" value="#ec4899" id="col-3"><label for="col-3" style="background: #ec4899;"></label>
-                  <input type="radio" name="avatar-color" value="#10b981" id="col-4"><label for="col-4" style="background: #10b981;"></label>
-                  <input type="radio" name="avatar-color" value="#f59e0b" id="col-5"><label for="col-5" style="background: #f59e0b;"></label>
-                  <input type="radio" name="avatar-color" value="#f43f5e" id="col-6"><label for="col-6" style="background: #f43f5e;"></label>
+            <!-- OTP Verification Step -->
+            <div id="step-otp" class="auth-step">
+                <button id="btn-back-phone" class="btn-text">
+                    <span class="material-icons-round">arrow_back</span> Back
+                </button>
+                <label>Verification Code</label>
+                <p class="subtitle">Sent to <span id="display-phone"></span></p>
+                <input type="number" id="input-otp" placeholder="123456">
+                
+                <!-- Optional Email (only shown if new user creation is needed) -->
+                <div id="new-user-fields" style="display: none; margin-top: 20px;">
+                    <label>Your Name</label>
+                    <input type="text" id="input-name" placeholder="John Doe">
+                    <label>Email (Optional)</label>
+                    <input type="email" id="input-email" placeholder="john@company.com">
                 </div>
-              </div>
-            </div>
 
-            <div class="sheet-footer">
-              <button type="button" class="btn btn-secondary col-6" id="btn-cancel-member">Cancel</button>
-              <button type="submit" class="btn btn-primary col-6">Save Member</button>
+                <button id="btn-verify-otp" class="btn-primary">Verify & Login</button>
             </div>
-          </form>
+            
+            <div id="auth-error-message" class="error-text"></div>
         </div>
-      </div>
+    </div>
 
-      <!-- 3. Fullscreen Mobile Inquiry Chat Page -->
-      <div class="fullscreen-chat-page" id="modal-status-inquiry">
-        <!-- Chat Header -->
-        <header class="chat-page-header">
-          <button class="btn-back-chat" id="btn-close-inquiry-modal">
-            <i data-lucide="chevron-left"></i>
-          </button>
-          
-          <div class="chat-recipient-profile">
-            <div class="avatar-sm" id="inquiry-recipient-avatar" style="background: #8b5cf6;">JD</div>
-            <div class="chat-recipient-meta">
-              <h4 id="inquiry-recipient-name">John Doe</h4>
-              <div class="recipient-presence-row">
-                <span class="presence-dot active"></span>
-                <span id="inquiry-recipient-role" class="chat-subtitle">Software Engineer</span>
-              </div>
+    <!-- Main Application Shell (Requires Auth) -->
+    <div id="main-app" class="screen" style="display: none;">
+        
+        <!-- Top App Bar -->
+        <header class="app-header">
+            <h2 id="header-title">Dashboard</h2>
+            <div class="header-actions">
+                <span id="btn-create-task-header" class="material-icons-round icon-btn">add_circle</span>
+                <span id="btn-logout" class="material-icons-round icon-btn">logout</span>
             </div>
-          </div>
-
-          <div class="chat-header-actions">
-            <!-- Channel Switcher pill -->
-            <div class="channel-pill" id="inquiry-active-channel-badge">
-              <i data-lucide="message-square" id="active-channel-icon"></i>
-              <span id="active-channel-name">Slack</span>
-            </div>
-          </div>
         </header>
 
-        <!-- Task Context Header bar -->
-        <div class="chat-task-banner">
-          <div class="banner-icon"><i data-lucide="clipboard-list"></i></div>
-          <div class="banner-info">
-            <span class="banner-title">STATUS INQUIRY FOR TASK</span>
-            <p id="inquiry-task-title" class="banner-task-name">Task Name Here</p>
-          </div>
-        </div>
+        <!-- Main Content Area -->
+        <main class="app-content">
+            
+            <!-- 1. Dashboard Screen -->
+            <section id="view-dashboard" class="view active">
+                <div id="dashboard-manager" class="dashboard-role-view">
+                    <!-- Manager Metrics -->
+                    <div class="metrics-grid">
+                        <div class="metric-card"><span class="value" id="mgr-open-tasks">0</span><span class="label">Open Tasks</span></div>
+                        <div class="metric-card danger"><span class="value" id="mgr-overdue-tasks">0</span><span class="label">Overdue</span></div>
+                    </div>
+                    <h3 class="section-title">Team Activity</h3>
+                    <div id="mgr-team-activity" class="list-container"></div>
+                </div>
 
-        <!-- Chat messages view -->
-        <div class="chat-messages-viewport" id="chat-messages">
-          <!-- Populated dynamically via app.js -->
-        </div>
+                <div id="dashboard-employee" class="dashboard-role-view">
+                    <!-- Employee Metrics -->
+                    <div class="metrics-grid">
+                        <div class="metric-card"><span class="value" id="emp-my-tasks">0</span><span class="label">My Tasks</span></div>
+                        <div class="metric-card success"><span class="value" id="emp-completed-today">0</span><span class="label">Done Today</span></div>
+                    </div>
+                    <h3 class="section-title">Requires Action</h3>
+                    <div id="emp-action-tasks" class="list-container"></div>
+                </div>
+            </section>
 
-        <!-- Typing status text indicator overlay -->
-        <div class="chat-typing-row hidden" id="chat-typing-container">
-          <div class="typing-indicator-bubble">
-            <span class="typing-dot"></span>
-            <span class="typing-dot"></span>
-            <span class="typing-dot"></span>
-          </div>
-          <span class="typing-caption">is typing...</span>
-        </div>
+            <!-- 2. Tasks Screen -->
+            <section id="view-tasks" class="view">
+                <div class="filters-bar">
+                    <button class="filter-chip active" data-filter="all">All</button>
+                    <button class="filter-chip" data-filter="my-tasks">My Tasks</button>
+                    <button class="filter-chip" data-filter="assigned-by-me">Assigned by Me</button>
+                    <button class="filter-chip" data-filter="overdue">Overdue</button>
+                </div>
+                <div id="all-tasks-list" class="list-container">
+                    <!-- Task Cards Injected Here -->
+                </div>
+            </section>
 
-        <!-- Chat Setup & Input Area (Bottom sheet controller layout) -->
-        <div class="chat-input-panel">
-          
-          <!-- Channel Select tabs -->
-          <div class="chat-channel-switcher">
-            <button class="channel-tab-btn active" data-channel="slack">
-              <i data-lucide="message-square"></i>
-              <span>Slack</span>
-            </button>
-            <button class="channel-tab-btn" data-channel="email">
-              <i data-lucide="mail"></i>
-              <span>Email</span>
-            </button>
-            <button class="channel-tab-btn" data-channel="teams">
-              <i data-lucide="users-2"></i>
-              <span>Teams</span>
-            </button>
-          </div>
+            <!-- 3. Activity Timeline Screen -->
+            <section id="view-activity" class="view">
+                <div id="global-activity-timeline" class="timeline-container">
+                    <!-- Activity Cards Injected Here -->
+                </div>
+            </section>
+            
+            <!-- 4. Profile Screen (Minimal) -->
+            <section id="view-profile" class="view">
+                <div class="profile-card">
+                    <h3 id="profile-name">Name</h3>
+                    <p id="profile-role">Role</p>
+                    <p id="profile-phone">Phone</p>
+                    <p id="profile-org">Org ID</p>
+                </div>
+            </section>
 
-          <!-- Message entry draft layout -->
-          <div class="message-composer-row">
-            <textarea id="inquiry-draft" rows="1" placeholder="Type a status request..."></textarea>
-            <button class="btn-send-composer" id="btn-send-inquiry" title="Send Request">
-              <i data-lucide="send"></i>
-            </button>
-          </div>
+        </main>
 
-          <!-- Inline suggestions/replies operations -->
-          <div class="chat-action-footer-mobile hidden" id="chat-actions">
-            <span class="action-footer-title"><i data-lucide="lightbulb" style="width:12px;height:12px;"></i> Auto-Actions</span>
-            <div class="action-footer-buttons">
-              <button class="btn btn-secondary btn-sm" id="btn-apply-log-reply">
-                <i data-lucide="file-text"></i> Log Comment
-              </button>
-              <button class="btn btn-primary btn-sm btn-accent-action" id="btn-apply-status-update">
-                <i data-lucide="refresh-cw"></i> Update Status
-              </button>
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <div class="nav-item active" data-target="view-dashboard">
+                <span class="material-icons-round">dashboard</span>
+                <span>Dashboard</span>
             </div>
-          </div>
-
-        </div>
-      </div>
-
+            <div class="nav-item" data-target="view-tasks">
+                <span class="material-icons-round">task_alt</span>
+                <span>Tasks</span>
+            </div>
+            <div class="nav-item" data-target="view-activity">
+                <span class="material-icons-round">history</span>
+                <span>Activity</span>
+            </div>
+            <div class="nav-item" data-target="view-profile">
+                <span class="material-icons-round">person</span>
+                <span>Profile</span>
+            </div>
+        </nav>
     </div>
-  </div>
 
-  <!-- Scripts -->
-  <!-- Note: data.js is temporarily kept if needed for fallback, but we load firebase and app as modules -->
-  <script src="data.js"></script>
-  <script type="module" src="firebase-config.js"></script>
-  <script type="module" src="app.js"></script>
+    <!-- Task Details Modal / Overlay Screen -->
+    <div id="task-details-screen" class="screen full-screen modal-overlay">
+        <div class="modal-content">
+            <header class="modal-header">
+                <span id="btn-close-task-details" class="material-icons-round icon-btn">close</span>
+                <h3>Task Details</h3>
+                <span id="btn-edit-task" class="material-icons-round icon-btn" style="display:none;">edit</span>
+            </header>
+            <div class="modal-body" id="task-details-body">
+                <!-- Task Content Injected Here -->
+            </div>
+            <div class="modal-actions" id="task-details-actions">
+                <!-- Action Buttons Injected Here based on role -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Task Modal -->
+    <div id="create-task-screen" class="screen full-screen modal-overlay">
+        <div class="modal-content">
+            <header class="modal-header">
+                <span id="btn-close-create-task" class="material-icons-round icon-btn">close</span>
+                <h3>New Task</h3>
+                <span class="spacer"></span>
+            </header>
+            <div class="modal-body">
+                <label>Title</label>
+                <input type="text" id="new-task-title" placeholder="What needs to be done?">
+                
+                <label>Description</label>
+                <textarea id="new-task-desc" placeholder="Details..."></textarea>
+                
+                <label>Assign To</label>
+                <select id="new-task-assignee"></select>
+                
+                <label>Priority</label>
+                <select id="new-task-priority">
+                    <option value="Low">Low</option>
+                    <option value="Medium" selected>Medium</option>
+                    <option value="High">High</option>
+                    <option value="Critical">Critical</option>
+                </select>
+                
+                <label>Due Date</label>
+                <input type="date" id="new-task-due">
+                
+                <button id="btn-save-task" class="btn-primary mt-20">Create Task</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module" src="js/services/firebase.js"></script>
+    
+    <!-- Application Scripts -->
+    <script type="module" src="app.js"></script>
 </body>
 </html>

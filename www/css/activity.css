@@ -1,0 +1,47 @@
+/* css/activity.css */
+.timeline-container {
+    position: relative;
+    padding-left: 20px;
+}
+.timeline-container::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: var(--bg-elevated);
+}
+
+.activity-card {
+    position: relative;
+    margin-bottom: 24px;
+}
+.activity-card::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: var(--bg-surface);
+    border: 3px solid var(--accent-primary);
+}
+
+.activity-card .time {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+.activity-card .message {
+    font-size: 14px;
+    color: var(--text-primary);
+    background-color: var(--bg-surface);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255,255,255,0.05);
+}
+.activity-card .message strong {
+    color: var(--accent-primary);
+}
